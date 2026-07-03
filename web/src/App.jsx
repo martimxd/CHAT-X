@@ -1,36 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
 import {
-  Ban,
   Check,
-  Download,
-  Edit3,
   FilePlus,
   Lock,
-  LogOut,
   MessageSquare,
-  Paperclip,
-  Pin,
-  Plus,
-  Reply,
-  Search,
-  Send,
-  Settings,
   Shield,
   Trash2,
-  UserPlus,
-  Users
+  UserPlus
 } from "lucide-react";
 import { I18nProvider, useI18n } from "./i18n/I18nProvider.jsx";
-import { API_BASE_URL, api, apiUrl, getToken, setToken } from "./lib/api.js";
+import { API_BASE_URL, api, getToken, setToken } from "./lib/api.js";
 import {
   clearPrivateKey,
-  decryptFileFromChat,
-  decryptPayload,
   decryptPrivateKeyBundle,
-  encryptFileForChat,
-  encryptPayload,
   encryptPrivateKeyJwk,
   generateChatKey,
   generateIdentityBundle,
@@ -38,26 +22,13 @@ import {
   unwrapChatKey,
   wrapChatKeyForUser
 } from "./lib/crypto.js";
+import { ChatLayout } from "./components/ChatLayout.jsx";
+import { ChatWindow } from "./components/ChatWindow.jsx";
+import { formatDateTime } from "./lib/format.js";
 import "./styles.css";
 
 function errorKey(error) {
   return `error_${error?.code || "unknown"}`;
-}
-
-function formatDate(value) {
-  if (!value) return "";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(new Date(value));
-}
-
-function classifyMessageType(file) {
-  if (!file) return "text";
-  if (file.type.startsWith("image/")) return "image";
-  if (file.type.startsWith("video/")) return "video";
-  if (file.type.startsWith("audio/")) return "audio";
-  return "file";
 }
 
 function AuthCard({ children }) {
@@ -245,14 +216,20 @@ function Shell({ user, setUser, onLogout }) {
   const { t, setLanguage } = useI18n();
   const [view, setView] = useState("chats");
   const [chats, setChats] = useState([]);
+  const [chatsLoading, setChatsLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [chatKey, setChatKey] = useState(null);
   const [eventVersion, setEventVersion] = useState(0);
   const chatKeys = useRef(new Map());
 
   const refreshChats = useCallback(async () => {
-    const data = await api("/api/chats");
-    setChats(data.chats);
+    setChatsLoading(true);
+    try {
+      const data = await api("/api/chats");
+      setChats(data.chats);
+    } finally {
+      setChatsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -324,33 +301,39 @@ function Shell({ user, setUser, onLogout }) {
     setLanguage(nextUser.language);
   }
 
+  const chatOpen = view === "chats" && selected && chatKey;
+
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <div>
-            <strong>{t("appName")}</strong>
-            <span>{user.displayName}</span>
-          </div>
-        </div>
-        <nav className="nav-buttons">
-          <button className={view === "chats" ? "active" : ""} onClick={() => setView("chats")}><MessageSquare size={18} />{t("chatListTitle")}</button>
-          <button className={view === "settings" ? "active" : ""} onClick={() => setView("settings")}><Settings size={18} />{t("settings")}</button>
-          {user.isAdmin && <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}><Shield size={18} />{t("adminConsole")}</button>}
-          <button onClick={onLogout}><LogOut size={18} />{t("logout")}</button>
-        </nav>
-        <ChatList chats={chats} onOpen={openChat} onCreateDirect={createDirect} onCreateGroup={createGroup} />
-      </aside>
-      <main className="workspace">
-        {view === "chats" && (
-          selected && chatKey
-            ? <ChatWindow chat={selected} chatKey={chatKey} user={user} eventVersion={eventVersion} onRefresh={() => openChat(selected.id)} />
-            : <EmptyState icon={<MessageSquare />} title={t("selectChat")} body={t("privacyModelBody")} />
-        )}
-        {view === "settings" && <SettingsPage user={user} setUser={updateUser} onLogout={onLogout} />}
-        {view === "admin" && user.isAdmin && <AdminConsole />}
-      </main>
-    </div>
+    <ChatLayout
+      user={user}
+      view={view}
+      setView={setView}
+      chats={chats}
+      selectedChatId={selected?.id}
+      chatsLoading={chatsLoading}
+      mobileChatOpen={Boolean(chatOpen)}
+      onOpen={openChat}
+      onCreateDirect={createDirect}
+      onCreateGroup={createGroup}
+      onLogout={onLogout}
+    >
+      {view === "chats" && (
+        chatOpen
+          ? (
+            <ChatWindow
+              chat={selected}
+              chatKey={chatKey}
+              user={user}
+              eventVersion={eventVersion}
+              onRefresh={() => openChat(selected.id)}
+              onBack={() => { setSelected(null); setChatKey(null); }}
+            />
+          )
+          : <EmptyState icon={<MessageSquare />} title={t("selectChat")} body={t("privacyModelBody")} />
+      )}
+      {view === "settings" && <SettingsPage user={user} setUser={updateUser} onLogout={onLogout} />}
+      {view === "admin" && user.isAdmin && <AdminConsole />}
+    </ChatLayout>
   );
 }
 
@@ -361,225 +344,6 @@ function EmptyState({ icon, title, body }) {
       <h2>{title}</h2>
       <p>{body}</p>
     </div>
-  );
-}
-
-function ChatList({ chats, onOpen, onCreateDirect, onCreateGroup }) {
-  const { t } = useI18n();
-  const [direct, setDirect] = useState("");
-  const [groupName, setGroupName] = useState("");
-  const [members, setMembers] = useState("");
-  const [error, setError] = useState("");
-
-  async function submitDirect(event) {
-    event.preventDefault();
-    setError("");
-    try {
-      await onCreateDirect(direct);
-      setDirect("");
-    } catch (err) {
-      setError(t(errorKey(err)));
-    }
-  }
-
-  async function submitGroup(event) {
-    event.preventDefault();
-    setError("");
-    try {
-      await onCreateGroup(groupName, members);
-      setGroupName("");
-      setMembers("");
-    } catch (err) {
-      setError(t(errorKey(err)));
-    }
-  }
-
-  return (
-    <section className="chat-list">
-      <h2>{t("chatListTitle")}</h2>
-      <form onSubmit={submitDirect} className="compact-form">
-        <input value={direct} onChange={(event) => setDirect(event.target.value)} placeholder={t("directPlaceholder")} />
-        <button title={t("newDirect")} aria-label={t("newDirect")}><Plus size={18} /></button>
-      </form>
-      <form onSubmit={submitGroup} className="group-form">
-        <input value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder={t("groupName")} />
-        <input value={members} onChange={(event) => setMembers(event.target.value)} placeholder={t("groupMembers")} />
-        <button><Users size={18} />{t("createGroup")}</button>
-      </form>
-      {error && <div className="error">{error}</div>}
-      <div className="chat-items">
-        {chats.length === 0 && <p className="muted">{t("noChats")}</p>}
-        {chats.map((chat) => (
-          <button key={chat.id} className="chat-item" onClick={() => onOpen(chat.id)}>
-            <span className="avatar">{chat.type === "group" ? <Users size={18} /> : <MessageSquare size={18} />}</span>
-            <span>
-              <strong>{chat.name || (chat.type === "group" ? t("groupChat") : t("directChat"))}</strong>
-              <small>{chat.latestMessage ? t("encryptedPreview") : t("noMessages")}</small>
-            </span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ChatWindow({ chat, chatKey, user, eventVersion, onRefresh }) {
-  const { t } = useI18n();
-  const [messages, setMessages] = useState([]);
-  const [decrypted, setDecrypted] = useState([]);
-  const [text, setText] = useState("");
-  const [file, setFile] = useState(null);
-  const [search, setSearch] = useState("");
-  const [replyTo, setReplyTo] = useState(null);
-  const [editing, setEditing] = useState(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    api(`/api/chats/${chat.id}/messages`)
-      .then((data) => { if (active) setMessages(data.messages); })
-      .catch(() => {});
-    return () => { active = false; };
-  }, [chat.id, eventVersion]);
-
-  useEffect(() => {
-    let active = true;
-    Promise.all(messages.map(async (message) => {
-      if (message.deletedForEveryoneAt || !message.encryptedPayload) return { message, body: null };
-      try {
-        return { message, body: await decryptPayload(chatKey, message.encryptedPayload) };
-      } catch {
-        return { message, body: { text: t("decryptFailed") } };
-      }
-    })).then((items) => { if (active) setDecrypted(items); });
-    return () => { active = false; };
-  }, [messages, chatKey, t]);
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return decrypted;
-    return decrypted.filter((item) => (item.body?.text || "").toLowerCase().includes(term));
-  }, [decrypted, search]);
-
-  async function submit(event) {
-    event.preventDefault();
-    setError("");
-    try {
-      if (editing) {
-        const envelope = await encryptPayload(chatKey, { text, editedAt: new Date().toISOString() });
-        await api(`/api/chats/${chat.id}/messages/${editing.id}`, { method: "PATCH", body: { encryptedPayload: envelope } });
-        setEditing(null);
-        setText("");
-        await onRefresh();
-        return;
-      }
-
-      let mediaId = null;
-      let mediaMetadata = null;
-      let messageType = "text";
-      if (file) {
-        const encrypted = await encryptFileForChat(chatKey, file);
-        const form = new FormData();
-        form.set("file", encrypted.encryptedBlob, `${file.name}.encrypted`);
-        form.set("chatId", chat.id);
-        form.set("purpose", "message");
-        form.set("encryptedBlob", "true");
-        form.set("metadata", JSON.stringify({ clientEncrypted: true, originalName: file.name }));
-        const upload = await api("/api/media", { method: "POST", body: form });
-        mediaId = upload.media.id;
-        mediaMetadata = { id: mediaId, ...encrypted.metadata };
-        messageType = classifyMessageType(file);
-      }
-
-      const envelope = await encryptPayload(chatKey, {
-        text,
-        media: mediaMetadata,
-        sentAt: new Date().toISOString()
-      });
-      await api(`/api/chats/${chat.id}/messages`, {
-        method: "POST",
-        body: {
-          encryptedPayload: envelope,
-          messageType,
-          mediaId,
-          replyToId: replyTo?.message.id || null
-        }
-      });
-      setText("");
-      setFile(null);
-      setReplyTo(null);
-      await onRefresh();
-    } catch (err) {
-      setError(t(errorKey(err)));
-    }
-  }
-
-  async function removeMessage(message, scope) {
-    await api(`/api/chats/${chat.id}/messages/${message.id}`, { method: "DELETE", body: { scope } });
-    await onRefresh();
-  }
-
-  async function downloadMedia(body) {
-    const link = await api(`/api/media/${body.media.id}/link`);
-    const response = await fetch(apiUrl(link.url), {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    });
-    const encryptedBlob = await response.blob();
-    const plaintext = await decryptFileFromChat(chatKey, encryptedBlob, body.media);
-    const url = URL.createObjectURL(plaintext);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = body.media.storedName || body.media.originalName || "media";
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }
-
-  const title = chat.name || chat.members?.filter((member) => member.id !== user.id).map((member) => member.displayName).join(", ");
-
-  return (
-    <section className="chat-window">
-      <header className="chat-header">
-        <div>
-          <h1>{title || t("chatListTitle")}</h1>
-          <p>{chat.type === "group" ? t("groupChats") : t("privacyModelTitle")}</p>
-        </div>
-        {chat.pinnedMessageId && <span className="pill"><Pin size={14} />{t("pinnedMessage")}</span>}
-      </header>
-      <div className="chat-tools">
-        <div className="search-box"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("localSearchPlaceholder")} /></div>
-      </div>
-      <div className="messages">
-        {filtered.length === 0 && <p className="muted center">{t("noMessages")}</p>}
-        {filtered.map(({ message, body }) => (
-          <article key={message.id} className={`message ${message.senderId === user.id ? "own" : ""}`}>
-            <div className="message-meta">
-              <strong>{message.senderDisplayName || message.senderUsername || t("deletedMessage")}</strong>
-              <span>{formatDate(message.createdAt)}</span>
-              {message.editedAt && <span>{t("editedLabel")}</span>}
-            </div>
-            <p>{message.deletedForEveryoneAt ? t("deletedMessage") : body?.text || t("encryptedPreview")}</p>
-            {body?.media && <button className="secondary small" onClick={() => downloadMedia(body)}><Download size={15} />{t("downloadMedia")}</button>}
-            <div className="message-actions">
-              <button title={t("reply")} aria-label={t("reply")} onClick={() => setReplyTo({ message, body })}><Reply size={15} /></button>
-              {message.senderId === user.id && <button title={t("edit")} aria-label={t("edit")} onClick={() => { setEditing(message); setText(body?.text || ""); }}><Edit3 size={15} /></button>}
-              <button title={t("deleteForMe")} aria-label={t("deleteForMe")} onClick={() => removeMessage(message, "me")}><Trash2 size={15} /></button>
-              {message.senderId === user.id && <button title={t("deleteForEveryone")} aria-label={t("deleteForEveryone")} onClick={() => removeMessage(message, "everyone")}><Ban size={15} /></button>}
-            </div>
-          </article>
-        ))}
-      </div>
-      <form className="composer" onSubmit={submit}>
-        {replyTo && <div className="compose-context">{t("replyTo")}: {replyTo.body?.text || t("encryptedPreview")} <button type="button" onClick={() => setReplyTo(null)}>{t("cancel")}</button></div>}
-        {file && <div className="compose-context">{t("mediaReady")}: {file.name} <button type="button" onClick={() => setFile(null)}>{t("cancel")}</button></div>}
-        {error && <div className="error">{error}</div>}
-        <label className="icon-upload" title={t("attachFile")} aria-label={t("attachFile")}>
-          <Paperclip size={20} />
-          <input type="file" onChange={(event) => setFile(event.target.files?.[0] || null)} />
-        </label>
-        <input value={text} onChange={(event) => setText(event.target.value)} placeholder={t("messagePlaceholder")} />
-        <button className="primary" title={t("send")} aria-label={t("send")}><Send size={18} /></button>
-      </form>
-    </section>
   );
 }
 
@@ -821,7 +585,7 @@ function AdminConsole() {
           <div className="table-list">
             {invites.map((invite) => (
               <div key={invite.id} className="table-row">
-                <span><strong>{invite.tokenPrefix}</strong><small>{formatDate(invite.expiresAt)} · {invite.useCount}/{invite.maxUses}</small></span>
+                <span><strong>{invite.tokenPrefix}</strong><small>{formatDateTime(invite.expiresAt)} · {invite.useCount}/{invite.maxUses}</small></span>
                 <span className="row-actions">
                   <em>{invite.revokedAt ? t("revoked") : invite.active ? t("active") : t("expired")}</em>
                   {!invite.revokedAt && <button onClick={() => revokeInvite(invite)}>{t("revoke")}</button>}
@@ -833,7 +597,7 @@ function AdminConsole() {
           <div className="table-list compact">
             {logs.map((log) => (
               <div key={log.id} className="table-row">
-                <span><strong>{log.action}</strong><small>{formatDate(log.created_at)}</small></span>
+                <span><strong>{log.action}</strong><small>{formatDateTime(log.created_at)}</small></span>
                 <em>{log.actor_username || t("deletedMessage")}</em>
               </div>
             ))}

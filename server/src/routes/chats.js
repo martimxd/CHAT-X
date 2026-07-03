@@ -72,9 +72,22 @@ chatsRouter.get(
       `SELECT c.*,
               ck.encrypted_key,
               lm.id AS latest_message_id,
+              lm.message_type AS latest_message_type,
+              lm.media_id AS latest_media_id,
               lm.encrypted_payload AS latest_encrypted_payload,
               lm.created_at AS latest_created_at,
-              lm.deleted_for_everyone_at AS latest_deleted_for_everyone_at
+              lm.deleted_for_everyone_at AS latest_deleted_for_everyone_at,
+              (
+                SELECT count(*)::int
+                FROM messages unread
+                WHERE unread.chat_id = c.id
+                  AND unread.sender_id IS DISTINCT FROM $1
+                  AND unread.deleted_for_everyone_at IS NULL
+                  AND unread.created_at > coalesce(cm.last_read_at, cm.joined_at)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM message_deletions md WHERE md.message_id = unread.id AND md.user_id = $1
+                  )
+              ) AS unread_count
        FROM chats c
        JOIN chat_members cm ON cm.chat_id = c.id
        LEFT JOIN chat_member_keys ck ON ck.chat_id = c.id AND ck.user_id = $1
@@ -103,10 +116,13 @@ chatsRouter.get(
         encryptedKey: row.encrypted_key,
         latestMessage: row.latest_message_id ? {
           id: row.latest_message_id,
+          messageType: row.latest_message_type,
+          mediaId: row.latest_media_id,
           encryptedPayload: row.latest_encrypted_payload,
           deletedForEveryoneAt: row.latest_deleted_for_everyone_at,
           createdAt: row.latest_created_at
         } : null,
+        unreadCount: row.unread_count,
         createdAt: row.created_at,
         updatedAt: row.updated_at
       }))
@@ -257,9 +273,19 @@ chatsRouter.get(
   requireMember,
   asyncHandler(async (req, res) => {
     const result = await query(
-      `SELECT m.*, u.username, u.display_name, u.avatar_media_id
+      `SELECT m.*,
+              u.username,
+              u.display_name,
+              u.avatar_media_id,
+              mf.original_name AS media_original_name,
+              mf.mime_type AS media_mime_type,
+              mf.byte_size AS media_byte_size,
+              mf.encrypted_blob AS media_encrypted_blob,
+              mf.metadata AS media_metadata,
+              mf.created_at AS media_created_at
        FROM messages m
        LEFT JOIN users u ON u.id = m.sender_id
+       LEFT JOIN media_files mf ON mf.id = m.media_id AND mf.deleted_at IS NULL
        WHERE m.chat_id = $1
          AND (m.expires_at IS NULL OR m.expires_at > now() OR m.deleted_for_everyone_at IS NOT NULL)
          AND NOT EXISTS (
@@ -278,6 +304,15 @@ chatsRouter.get(
         senderDisplayName: row.display_name,
         replyToId: row.reply_to_id,
         mediaId: row.media_id,
+        media: row.media_id ? {
+          id: row.media_id,
+          filename: row.media_original_name,
+          mimeType: row.media_mime_type,
+          size: row.media_byte_size === null ? null : Number(row.media_byte_size),
+          encryptedBlob: row.media_encrypted_blob,
+          metadata: row.media_metadata,
+          createdAt: row.media_created_at
+        } : null,
         messageType: row.message_type,
         encryptedPayload: row.encrypted_payload,
         payloadVersion: row.payload_version,
