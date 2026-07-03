@@ -18,21 +18,30 @@ export async function verifyPassword(password, hash) {
   return bcrypt.compare(password, hash);
 }
 
-export async function createSession(userId, userAgent) {
+function getDeviceName(userAgent) {
+  if (!userAgent) return "Unknown browser";
+  if (userAgent.includes("Firefox")) return "Firefox";
+  if (userAgent.includes("Edg/")) return "Edge";
+  if (userAgent.includes("Chrome")) return "Chrome";
+  if (userAgent.includes("Safari")) return "Safari";
+  return userAgent.slice(0, 80);
+}
+
+export async function createSession(userId, userAgent, metadata = {}) {
   const token = randomToken(32);
   const tokenHash = sha256Hex(token);
   const expiresAt = new Date(Date.now() + config.sessionTtlHours * 60 * 60 * 1000);
   await query(
-    `INSERT INTO user_sessions (user_id, token_hash, user_agent, expires_at)
-     VALUES ($1, $2, $3, $4)`,
-    [userId, tokenHash, userAgent || null, expiresAt]
+    `INSERT INTO user_sessions (user_id, token_hash, user_agent, device_name, ip_address, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [userId, tokenHash, userAgent || null, metadata.deviceName || getDeviceName(userAgent), metadata.ipAddress || null, expiresAt]
   );
   return { token, expiresAt };
 }
 
 export async function destroySession(token) {
   if (!token) return;
-  await query("DELETE FROM user_sessions WHERE token_hash = $1", [sha256Hex(token)]);
+  await query("UPDATE user_sessions SET revoked_at = now() WHERE token_hash = $1", [sha256Hex(token)]);
 }
 
 export async function loadSession(token) {
@@ -53,12 +62,18 @@ export async function loadSession(token) {
        u.show_read_receipts,
        u.show_online_status,
        u.default_disappearing_seconds,
+       u.theme,
+       u.notifications_enabled,
+       u.notification_previews,
+       u.online_visibility,
+       u.last_seen_visibility,
+       u.show_typing_status,
        u.public_key_jwk,
        u.encrypted_private_key_jwk,
        u.avatar_media_id
      FROM user_sessions s
      JOIN users u ON u.id = s.user_id
-     WHERE s.token_hash = $1 AND s.expires_at > now()`,
+     WHERE s.token_hash = $1 AND s.expires_at > now() AND s.revoked_at IS NULL`,
     [sha256Hex(token)]
   );
   if (result.rowCount === 0) return null;
@@ -79,6 +94,12 @@ export function serializeUser(user) {
     showReadReceipts: user.show_read_receipts,
     showOnlineStatus: user.show_online_status,
     defaultDisappearingSeconds: user.default_disappearing_seconds,
+    theme: user.theme || "system",
+    notificationsEnabled: Boolean(user.notifications_enabled),
+    notificationPreviews: Boolean(user.notification_previews),
+    onlineVisibility: user.online_visibility || "everyone",
+    lastSeenVisibility: user.last_seen_visibility || "everyone",
+    showTypingStatus: user.show_typing_status !== false,
     hasKeyBundle: Boolean(user.public_key_jwk && user.encrypted_private_key_jwk),
     publicKeyJwk: user.public_key_jwk,
     encryptedPrivateKeyJwk: user.encrypted_private_key_jwk,

@@ -1,6 +1,6 @@
-# SELF-HOST-SIGNAL-MESSENGER
+# Chat X
 
-SELF-HOST-SIGNAL-MESSENGER is a private self-hosted messaging platform inspired by Signal and Telegram workflows. It includes a Node.js API, React web client, PostgreSQL database, encrypted media storage, Docker deployment, invitation-only registration, admin controls, WebSockets, and English/Portuguese/French UI translations.
+Chat X is a private self-hosted messaging platform inspired by modern secure messengers. It includes a Node.js API, React web client, PostgreSQL database, encrypted media storage, Docker deployment, invitation-only registration, admin controls, WebSockets, and English/Portuguese/French UI translations.
 
 This project uses the Signal ecosystem as a technical reference, especially the public Signal organization and libsignal direction:
 
@@ -49,11 +49,16 @@ Phase 2 should replace the Phase 1 chat-key model with a maintained Signal Proto
 - Invitation links with expiration, maximum uses, active/expired listing, and revocation.
 - Direct chats and group chats.
 - Group admins, group names, disappearing timers, and pinned message metadata.
+- Group leave flow, group image uploads, group permissions, admin promotion/demotion, and member removal.
 - Message replies, edits, delete for me, and delete for everyone.
-- Typing indicators and presence events over WebSockets.
-- Read receipts and online status privacy toggles.
+- Real-time online, last-seen, and typing presence over WebSockets with privacy enforcement.
+- Read receipts, online visibility, last-seen visibility, and typing status privacy controls.
 - Encrypted image, video, audio, and file message uploads.
 - Authenticated temporary media URLs.
+- Telegram-style contact/group info panels with shared Media, Files, Links, and GIFs tabs. Message bodies remain encrypted; link discovery is client-side after decryption.
+- QR login approval from an already logged-in device.
+- One-to-one WebRTC video calls with configurable STUN/TURN signaling.
+- Browser notification controls and light/dark/system theme selection.
 - Expired disappearing-message cleanup.
 - Orphan media cleanup.
 - User settings for display name, avatar, language, privacy toggles, default disappearing timer, password change, and account deletion.
@@ -118,6 +123,9 @@ Important variables:
 - `SIGNED_MEDIA_URL_TTL_SECONDS`: temporary media URL lifetime.
 - `VIDEO_COMPRESSION_CRF`: FFmpeg CRF when trusted processing is enabled.
 - `ALLOW_TRUSTED_MEDIA_PROCESSING`: opt-in server-side plaintext media compression before encrypted-at-rest storage.
+- `QR_LOGIN_TTL_SECONDS`: short QR login request lifetime.
+- `STUN_URLS`: comma-separated STUN server URLs for WebRTC calls.
+- `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL`: optional TURN settings for production WebRTC reliability.
 - `HTTPS_ONLY`: deployment flag for documentation and reverse-proxy hardening.
 
 Generate production secrets:
@@ -145,16 +153,16 @@ Back up PostgreSQL and media together. Database rows reference media IDs and sto
 Backup:
 
 ```bash
-docker compose exec db pg_dump -U self_host_signal self_host_signal_messenger > backup.sql
-docker run --rm -v self-host-signal-messenger_media_data:/media -v "$PWD":/backup alpine tar czf /backup/media.tar.gz /media
+docker compose exec db pg_dump -U chat_x chat_x > backup.sql
+docker run --rm -v chat-x_media_data:/media -v "$PWD":/backup alpine tar czf /backup/media.tar.gz /media
 ```
 
 Restore:
 
 ```bash
 docker compose up -d db
-cat backup.sql | docker compose exec -T db psql -U self_host_signal self_host_signal_messenger
-docker run --rm -v self-host-signal-messenger_media_data:/media -v "$PWD":/backup alpine sh -c "rm -rf /media/* && tar xzf /backup/media.tar.gz -C /"
+cat backup.sql | docker compose exec -T db psql -U chat_x chat_x
+docker run --rm -v chat-x_media_data:/media -v "$PWD":/backup alpine sh -c "rm -rf /media/* && tar xzf /backup/media.tar.gz -C /"
 docker compose up -d --build
 ```
 
@@ -256,14 +264,14 @@ Create and route a named tunnel:
 
 ```bash
 cloudflared tunnel login
-cloudflared tunnel create self-host-signal-messenger
-cloudflared tunnel route dns self-host-signal-messenger chat.example.com
+cloudflared tunnel create chat-x
+cloudflared tunnel route dns chat-x chat.example.com
 ```
 
 Create a config file such as `/etc/cloudflared/config.yml`:
 
 ```yaml
-tunnel: self-host-signal-messenger
+tunnel: chat-x
 credentials-file: /root/.cloudflared/<tunnel-id>.json
 ingress:
   - hostname: chat.example.com
@@ -370,7 +378,7 @@ Current tests cover password policy, storage encryption helpers, opaque token ge
 If GitHub authentication is available, this project can be created as:
 
 ```bash
-gh repo create SELF-HOST-SIGNAL-MESSENGER --private --source=. --remote=origin --push
+gh repo create CHAT-X --private --source=. --remote=origin --push
 ```
 
 Manual fallback:
@@ -380,7 +388,7 @@ git init
 git add .
 git commit -m "Initial self-hosted messenger implementation"
 git branch -M main
-git remote add origin https://github.com/<your-user>/SELF-HOST-SIGNAL-MESSENGER.git
+git remote add origin https://github.com/<your-user>/CHAT-X.git
 git push -u origin main
 ```
 

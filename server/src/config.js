@@ -35,12 +35,12 @@ function readMediaKey() {
 
 export const config = {
   nodeEnv: process.env.NODE_ENV || "development",
-  appName: process.env.APP_NAME || "SELF-HOST-SIGNAL-MESSENGER",
+  appName: process.env.APP_NAME || "Chat X",
   publicAppUrl: process.env.PUBLIC_APP_URL || "http://localhost:3000",
   port: asNumber("API_PORT", 4000),
   trustProxy: asBoolean("TRUST_PROXY", false),
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:3000",
-  databaseUrl: process.env.DATABASE_URL || "postgres://self_host_signal:change-this-database-password@localhost:5432/self_host_signal_messenger",
+  databaseUrl: process.env.DATABASE_URL || "postgres://chat_x:change-this-database-password@localhost:5432/chat_x",
   bcryptCost: asNumber("BCRYPT_COST", 12),
   sessionTtlHours: asNumber("SESSION_TTL_HOURS", 168),
   loginRateLimitMax: asNumber("LOGIN_RATE_LIMIT_MAX", 8),
@@ -55,5 +55,10 @@ export const config = {
   allowTrustedMediaProcessing: asBoolean("ALLOW_TRUSTED_MEDIA_PROCESSING", false),
   cleanupIntervalSeconds: asNumber("CLEANUP_INTERVAL_SECONDS", 300),
   orphanMediaRetentionHours: asNumber("ORPHAN_MEDIA_RETENTION_HOURS", 24),
-  httpsOnly: asBoolean("HTTPS_ONLY", false)
+  httpsOnly: asBoolean("HTTPS_ONLY", false),
+  qrLoginTtlSeconds: asNumber("QR_LOGIN_TTL_SECONDS", 120),
+  stunUrls: (process.env.STUN_URLS || "stun:stun.l.google.com:19302").split(",").map((value) => value.trim()).filter(Boolean),
+  turnUrls: (process.env.TURN_URLS || "").split(",").map((value) => value.trim()).filter(Boolean),
+  turnUsername: process.env.TURN_USERNAME || "",
+  turnCredential: process.env.TURN_CREDENTIAL || ""
 };

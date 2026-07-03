@@ -3,6 +3,8 @@ import { FileText, Image, Music, Video } from "lucide-react";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 import { formatTime } from "../lib/format.js";
 import { Avatar } from "./Avatar.jsx";
+import { getChatTitle, getDirectPeer } from "../lib/chat.js";
+import { typingSummary } from "../lib/presence.js";
 
 function latestLabel(chat, t) {
   if (!chat.latestMessage) return t("noMessages");
@@ -22,14 +24,21 @@ function LatestIcon({ type }) {
   return null;
 }
 
-export function ChatListItem({ chat, selected, onOpen }) {
+export function ChatListItem({ chat, selected, onOpen, currentUser, presence, typingUsers }) {
   const { t } = useI18n();
-  const title = chat.name || (chat.type === "group" ? t("groupChat") : t("directChat"));
+  const peer = getDirectPeer(chat, currentUser);
+  const peerPresence = peer ? presence?.get(peer.id) : null;
+  const title = getChatTitle(chat, currentUser, t);
   const unreadCount = Number(chat.unreadCount || 0);
+  const typing = typingSummary(chat, currentUser, typingUsers, t);
+  const avatarMediaId = chat.type === "group" ? chat.avatarMediaId : peer?.avatarMediaId;
 
   return (
     <button className={`chat-list-item ${selected ? "selected" : ""}`} onClick={() => onOpen(chat.id)}>
-      <Avatar name={title} type={chat.type} />
+      <span className="avatar-presence">
+        <Avatar name={title} type={chat.type} mediaId={avatarMediaId} />
+        {peerPresence?.online && <i aria-label={t("online")} />}
+      </span>
       <span className="chat-list-main">
         <span className="chat-list-row">
           <strong>{title}</strong>
@@ -37,8 +46,7 @@ export function ChatListItem({ chat, selected, onOpen }) {
         </span>
         <span className="chat-list-row chat-list-preview">
           <span>
-            <LatestIcon type={chat.latestMessage?.messageType} />
-            {latestLabel(chat, t)}
+            {typing ? typing : <><LatestIcon type={chat.latestMessage?.messageType} />{latestLabel(chat, t)}</>}
           </span>
           {unreadCount > 0 && <em className="unread-badge">{unreadCount > 99 ? "99+" : unreadCount}</em>}
         </span>

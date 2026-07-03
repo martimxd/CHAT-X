@@ -14,7 +14,9 @@ export function ChatSidebar({
   onOpen,
   onCreateDirect,
   onCreateGroup,
-  onLogout
+  onLogout,
+  presence,
+  typingByChat
 }) {
   const { t } = useI18n();
   const [search, setSearch] = useState("");
@@ -90,7 +92,7 @@ export function ChatSidebar({
         {loading && [0, 1, 2, 3].map((item) => <div key={item} className="chat-skeleton" />)}
         {!loading && filteredChats.length === 0 && <p className="empty-list-copy">{t("noChats")}</p>}
         {!loading && filteredChats.map((chat) => (
-          <ChatListItem key={chat.id} chat={chat} selected={chat.id === selectedChatId} onOpen={onOpen} />
+          <ChatListItem key={chat.id} chat={chat} selected={chat.id === selectedChatId} onOpen={onOpen} currentUser={user} presence={presence} typingUsers={typingByChat?.get(chat.id)} />
         ))}
       </section>
     </aside>

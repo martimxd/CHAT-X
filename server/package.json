@@ -1,5 +1,5 @@
 {
-  "name": "@self-host-signal-messenger/server",
+  "name": "@chat-x/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -1,8 +1,8 @@
 {
-  "name": "self-host-signal-messenger",
+  "name": "chat-x",
   "version": "0.1.0",
   "private": true,
-  "description": "Self-hosted private messaging platform with encrypted payload boundaries, admin-controlled accounts, Docker deployment, and multilingual UI.",
+  "description": "Chat X self-hosted private messaging platform with encrypted payload boundaries, admin-controlled accounts, Docker deployment, and multilingual UI.",
   "workspaces": [
     "server",
     "web"

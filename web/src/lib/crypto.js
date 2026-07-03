@@ -1,4 +1,4 @@
-const PRIVATE_KEY_STORAGE = "shsm_private_key_jwk";
+const PRIVATE_KEY_STORAGE = "chatx_private_key_jwk";
 const PBKDF2_ITERATIONS = 250000;
 
 function bytesToBase64(bytes) {

@@ -27,7 +27,7 @@ export async function userCanAccessMedia(userId, mediaId) {
      WHERE m.id = $1
        AND m.deleted_at IS NULL
        AND (
-         m.purpose = 'avatar'
+         m.purpose IN ('avatar', 'group_avatar')
          OR m.uploader_id = $2
          OR EXISTS (
            SELECT 1

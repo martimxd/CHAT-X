@@ -14,6 +14,7 @@ import { adminRouter } from "./routes/admin.js";
 import { chatsRouter } from "./routes/chats.js";
 import { mediaRouter } from "./routes/media.js";
 import { usersRouter } from "./routes/users.js";
+import { callsRouter } from "./routes/calls.js";
 import { apiError } from "./lib/validators.js";
 import { setupSocket } from "./socket.js";
 
@@ -38,6 +39,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/chats", chatsRouter);
 app.use("/api/media", mediaRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/calls", callsRouter);
 
 app.use((req, res) => apiError(res, 404, "route_not_found"));
 

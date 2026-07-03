@@ -1,5 +1,5 @@
 {
-  "name": "@self-host-signal-messenger/web",
+  "name": "@chat-x/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "lucide-react": "^0.469.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "socket.io-client": "^4.8.1"

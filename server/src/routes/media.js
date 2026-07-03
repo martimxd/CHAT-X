@@ -14,6 +14,7 @@ import { asyncHandler } from "../lib/http.js";
 import { ensureMediaRoot, storagePathFor, userCanAccessMedia } from "../lib/media.js";
 import { requireAuth } from "../lib/auth.js";
 import { apiError } from "../lib/validators.js";
+import { permissionAllows } from "../lib/social.js";
 
 export const mediaRouter = express.Router();
 const execFileAsync = promisify(execFile);
@@ -22,9 +23,10 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: config.maxUploadBytes }
 });
+const avatarMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 async function compressVideo(buffer) {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "shsm-video-"));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "chatx-video-"));
   const input = path.join(dir, "input");
   const output = path.join(dir, "output.mp4");
   try {
@@ -61,7 +63,7 @@ mediaRouter.post(
 
     const parsed = z.object({
       chatId: z.string().uuid().optional(),
-      purpose: z.enum(["message", "avatar"]).default("message"),
+      purpose: z.enum(["message", "avatar", "group_avatar"]).default("message"),
       encryptedBlob: z.preprocess((value) => {
         if (value === undefined) return true;
         if (value === "true" || value === true) return true;
@@ -72,7 +74,7 @@ mediaRouter.post(
     }).safeParse(req.body);
     if (!parsed.success) return apiError(res, 400, "validation_failed", parsed.error.flatten());
 
-    const { chatId, purpose, encryptedBlob } = parsed.data;
+    let { chatId, purpose, encryptedBlob } = parsed.data;
     let metadata = {};
     if (parsed.data.metadata) {
       try {
@@ -88,10 +90,28 @@ mediaRouter.post(
       if (member.rowCount === 0) return apiError(res, 403, "chat_access_denied");
       if (!encryptedBlob && !config.allowTrustedMediaProcessing) return apiError(res, 400, "message_media_must_be_client_encrypted");
     }
+    if (purpose === "group_avatar") {
+      if (!chatId) return apiError(res, 400, "chat_required");
+      const member = await query(
+        `SELECT c.change_image_permission, cm.role
+         FROM chats c
+         JOIN chat_members cm ON cm.chat_id = c.id
+         WHERE c.id = $1 AND c.type = 'group' AND cm.user_id = $2 AND cm.deleted_at IS NULL AND c.archived_at IS NULL`,
+        [chatId, req.user.id]
+      );
+      if (member.rowCount === 0) return apiError(res, 403, "chat_access_denied");
+      if (!permissionAllows(member.rows[0].change_image_permission, member.rows[0].role)) {
+        return apiError(res, 403, "group_permission_denied");
+      }
+    }
+    if (purpose === "avatar" || purpose === "group_avatar") {
+      if (!avatarMimeTypes.has(req.file.mimetype)) return apiError(res, 400, "unsupported_avatar_type");
+      encryptedBlob = false;
+    }
 
     let payload = req.file.buffer;
     let mimeType = req.file.mimetype || "application/octet-stream";
-    if ((purpose === "avatar" || !encryptedBlob) && mimeType.startsWith("image/")) {
+    if ((purpose === "avatar" || purpose === "group_avatar" || !encryptedBlob) && mimeType.startsWith("image/")) {
       payload = await sharp(payload).rotate().resize(512, 512, { fit: "cover" }).webp({ quality: 82 }).toBuffer();
       mimeType = "image/webp";
       metadata = { ...metadata, serverCompressed: true };
@@ -136,6 +156,10 @@ mediaRouter.post(
 
     if (purpose === "avatar") {
       await query("UPDATE users SET avatar_media_id = $1, updated_at = now() WHERE id = $2", [mediaId, req.user.id]);
+    }
+    if (purpose === "group_avatar") {
+      await query("UPDATE chats SET avatar_media_id = $1, updated_at = now() WHERE id = $2", [mediaId, chatId]);
+      req.app.get("io")?.to(`chat:${chatId}`).emit("chat:updated", { chatId });
     }
 
     return res.status(201).json({

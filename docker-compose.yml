@@ -3,13 +3,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-self_host_signal_messenger}
-      POSTGRES_USER: ${POSTGRES_USER:-self_host_signal}
+      POSTGRES_DB: ${POSTGRES_DB:-chat_x}
+      POSTGRES_USER: ${POSTGRES_USER:-chat_x}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-database-password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-self_host_signal} -d ${POSTGRES_DB:-self_host_signal_messenger}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chat_x} -d ${POSTGRES_DB:-chat_x}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,10 +23,10 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      APP_NAME: ${APP_NAME:-SELF-HOST-SIGNAL-MESSENGER}
+      APP_NAME: ${APP_NAME:-Chat X}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
-      DATABASE_URL: ${DATABASE_URL:-postgres://self_host_signal:change-this-database-password@db:5432/self_host_signal_messenger}
+      DATABASE_URL: ${DATABASE_URL:-postgres://chat_x:change-this-database-password@db:5432/chat_x}
       MEDIA_ROOT: /app/media
       API_PORT: 4000
       TRUST_PROXY: ${TRUST_PROXY:-false}

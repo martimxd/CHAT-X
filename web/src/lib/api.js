@@ -1,13 +1,16 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-const TOKEN_KEY = "shsm_token";
+const TOKEN_KEY = "chatx_token";
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
 
 export function setToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
 }
 
 export async function api(path, options = {}) {

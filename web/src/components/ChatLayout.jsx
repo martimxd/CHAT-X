@@ -13,6 +13,8 @@ export function ChatLayout({
   onCreateDirect,
   onCreateGroup,
   onLogout,
+  presence,
+  typingByChat,
   children
 }) {
   return (
@@ -28,6 +30,8 @@ export function ChatLayout({
         onCreateDirect={onCreateDirect}
         onCreateGroup={onCreateGroup}
         onLogout={onLogout}
+        presence={presence}
+        typingByChat={typingByChat}
       />
       <main className="wa-workspace">{children}</main>
     </div>

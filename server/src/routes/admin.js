@@ -4,7 +4,7 @@ import { config } from "../config.js";
 import { query } from "../db.js";
 import { hashPassword, requireAdmin, requireAuth } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
-import { randomToken, sha256Hex } from "../lib/crypto.js";
+import { decryptFromStorage, encryptForStorage, randomToken, sha256Hex } from "../lib/crypto.js";
 import { asyncHandler, pickUserPublic } from "../lib/http.js";
 import { apiError, parseBody, passwordSchema, usernameSchema } from "../lib/validators.js";
 
@@ -111,17 +111,29 @@ adminRouter.get(
        ORDER BY i.created_at DESC`
     );
     return res.json({
-      invites: result.rows.map((invite) => ({
+      invites: result.rows.map((invite) => {
+        let url = null;
+        if (invite.token_ciphertext && invite.token_encryption) {
+          try {
+            const token = decryptFromStorage(invite.token_ciphertext, invite.token_encryption).toString("utf8");
+            url = `${config.publicAppUrl}/invite/${token}`;
+          } catch {
+            url = null;
+          }
+        }
+        return {
         id: invite.id,
         tokenPrefix: invite.token_prefix,
         createdBy: invite.created_by_username,
+        url,
         expiresAt: invite.expires_at,
         maxUses: invite.max_uses,
         useCount: invite.use_count,
         revokedAt: invite.revoked_at,
         createdAt: invite.created_at,
         active: !invite.revoked_at && new Date(invite.expires_at).getTime() > Date.now() && invite.use_count < invite.max_uses
-      }))
+        };
+      })
     });
   })
 );
@@ -135,13 +147,15 @@ adminRouter.post(
   asyncHandler(async (req, res) => {
     const { expiresAt, maxUses } = req.validatedBody;
     if (expiresAt.getTime() <= Date.now()) return apiError(res, 400, "invite_expiration_in_past");
+    if (expiresAt.getTime() > Date.now() + 31 * 24 * 60 * 60 * 1000) return apiError(res, 400, "invite_expiration_too_long");
     const token = randomToken(32);
     const tokenPrefix = token.slice(0, 8);
+    const encryptedToken = encryptForStorage(Buffer.from(token, "utf8"));
     const result = await query(
-      `INSERT INTO invite_links (token_hash, token_prefix, created_by, expires_at, max_uses)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO invite_links (token_hash, token_prefix, token_ciphertext, token_encryption, created_by, expires_at, max_uses)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [sha256Hex(token), tokenPrefix, req.user.id, expiresAt, maxUses]
+      [sha256Hex(token), tokenPrefix, encryptedToken.ciphertext, encryptedToken.envelope, req.user.id, expiresAt, maxUses]
     );
     await audit(req.user.id, "invite_created", "invite", result.rows[0].id, { expiresAt, maxUses });
     return res.status(201).json({
