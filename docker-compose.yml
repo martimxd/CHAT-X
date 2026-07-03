@@ -1,0 +1,76 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-self_host_signal_messenger}
+      POSTGRES_USER: ${POSTGRES_USER:-self_host_signal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-database-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-self_host_signal} -d ${POSTGRES_DB:-self_host_signal_messenger}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ./server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      APP_NAME: ${APP_NAME:-SELF-HOST-SIGNAL-MESSENGER}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      DATABASE_URL: ${DATABASE_URL:-postgres://self_host_signal:change-this-database-password@db:5432/self_host_signal_messenger}
+      MEDIA_ROOT: /app/media
+      API_PORT: 4000
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-168}
+      BCRYPT_COST: ${BCRYPT_COST:-12}
+      LOGIN_RATE_LIMIT_MAX: ${LOGIN_RATE_LIMIT_MAX:-8}
+      REGISTER_RATE_LIMIT_MAX: ${REGISTER_RATE_LIMIT_MAX:-8}
+      MESSAGE_RATE_LIMIT_MAX: ${MESSAGE_RATE_LIMIT_MAX:-120}
+      MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:-dev-only-change-this-media-signing-secret}
+      MEDIA_ENCRYPTION_KEY_BASE64: ${MEDIA_ENCRYPTION_KEY_BASE64:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-52428800}
+      SIGNED_MEDIA_URL_TTL_SECONDS: ${SIGNED_MEDIA_URL_TTL_SECONDS:-300}
+      VIDEO_COMPRESSION_CRF: ${VIDEO_COMPRESSION_CRF:-28}
+      ALLOW_TRUSTED_MEDIA_PROCESSING: ${ALLOW_TRUSTED_MEDIA_PROCESSING:-false}
+      CLEANUP_INTERVAL_SECONDS: ${CLEANUP_INTERVAL_SECONDS:-300}
+      ORPHAN_MEDIA_RETENTION_HOURS: ${ORPHAN_MEDIA_RETENTION_HOURS:-24}
+      HTTPS_ONLY: ${HTTPS_ONLY:-false}
+    volumes:
+      - media_data:/app/media
+    ports:
+      - "${API_PORT:-4000}:4000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: ./web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:4000}
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  media_data:

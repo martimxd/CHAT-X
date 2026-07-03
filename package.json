@@ -1,0 +1,21 @@
+{
+  "name": "self-host-signal-messenger",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted private messaging platform with encrypted payload boundaries, admin-controlled accounts, Docker deployment, and multilingual UI.",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm --workspace server run dev",
+    "lint": "npm --workspaces run lint",
+    "test": "npm --workspaces run test",
+    "build": "npm --workspaces run build",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=18.19.0"
+  }
+}
