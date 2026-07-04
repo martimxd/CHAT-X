@@ -12,7 +12,7 @@ import {
   UserPlus
 } from "lucide-react";
 import { I18nProvider, useI18n } from "./i18n/I18nProvider.jsx";
-import { API_BASE_URL, api, getToken, setToken } from "./lib/api.js";
+import { api, getToken, networkHint, setToken, socketUrl } from "./lib/api.js";
 import {
   clearPrivateKey,
   decryptPrivateKeyBundle,
@@ -330,6 +330,7 @@ function Shell({ user, setUser, onLogout }) {
   const [chatKey, setChatKey] = useState(null);
   const [eventVersion, setEventVersion] = useState(0);
   const [socket, setSocket] = useState(null);
+  const [socketStatus, setSocketStatus] = useState("connecting");
   const [call, setCall] = useState(null);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [presence, setPresence] = useState(new Map());
@@ -352,8 +353,25 @@ function Shell({ user, setUser, onLogout }) {
   }, [refreshChats, eventVersion]);
 
   useEffect(() => {
-    const nextSocket = io(API_BASE_URL || undefined, { auth: { token: getToken() } });
+    const nextSocket = io(socketUrl(), {
+      auth: { token: getToken() },
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 8000,
+      randomizationFactor: 0.5,
+      timeout: 10000,
+      transports: ["websocket", "polling"]
+    });
     setSocket(nextSocket);
+    setSocketStatus("connecting");
+    nextSocket.on("connect", () => setSocketStatus("connected"));
+    nextSocket.on("connect_error", (error) => {
+      if (import.meta.env.DEV) console.warn("Socket connection failed", { message: error.message, hint: networkHint() });
+      setSocketStatus("disconnected");
+    });
+    nextSocket.on("disconnect", () => setSocketStatus("disconnected"));
+    nextSocket.io.on("reconnect_attempt", () => setSocketStatus("connecting"));
     const onMessage = (payload) => {
       setEventVersion((value) => value + 1);
       if (document.hidden && user.notificationsEnabled && window.Notification?.permission === "granted") {
@@ -437,6 +455,7 @@ function Shell({ user, setUser, onLogout }) {
     return () => {
       nextSocket.close();
       setSocket(null);
+      setSocketStatus("disconnected");
     };
   }, [selected?.id, t, user.notificationPreviews, user.notificationsEnabled]);
 
@@ -533,6 +552,7 @@ function Shell({ user, setUser, onLogout }) {
       onLogout={onLogout}
       presence={presence}
       typingByChat={typingByChat}
+      connectionStatus={socketStatus}
     >
       {view === "chats" && (
         chatOpen

@@ -35,6 +35,7 @@ export default [
         atob: "readonly",
         btoa: "readonly",
         crypto: "readonly",
+        console: "readonly",
         document: "readonly",
         fetch: "readonly",
         localStorage: "readonly",

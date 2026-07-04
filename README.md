@@ -87,7 +87,7 @@ http://localhost:3000
 If ports `3000` or `4000` are already used on your host:
 
 ```bash
-WEB_PORT=3001 API_PORT=4001 VITE_API_BASE_URL=http://localhost:4001 CORS_ORIGIN=http://localhost:3001 PUBLIC_APP_URL=http://localhost:3001 docker compose up -d --build
+WEB_PORT=3001 API_PORT=4001 APP_PUBLIC_URL=http://localhost:3001 API_PUBLIC_URL=http://localhost:3001 ALLOWED_ORIGINS=http://localhost:3001,http://127.0.0.1:3001 docker compose up -d --build
 ```
 
 Default first login:
@@ -109,9 +109,15 @@ cp .env.example .env
 
 Important variables:
 
-- `PUBLIC_APP_URL`: external URL used for invite links.
-- `VITE_API_BASE_URL`: API origin compiled into the web client. Use `http://localhost:4000` locally or your public HTTPS origin behind a reverse proxy.
-- `CORS_ORIGIN`: frontend origin allowed by the API.
+- `APP_PUBLIC_URL`: external app URL used as the fallback for invite links and generated public URLs.
+- `API_PUBLIC_URL`: external API URL. Use the same value as `APP_PUBLIC_URL` when the API is served under `/api` on the same origin.
+- `ALLOWED_ORIGINS`: comma-separated browser origins allowed by the API and WebSocket server.
+- `ALLOW_CLOUDFLARE_TEMP_TUNNELS`: set to `true` to allow `https://*.trycloudflare.com` origins for temporary tunnel testing.
+- `TRUST_PROXY`: set to `true` when running behind Docker nginx, Cloudflare Tunnel, Caddy, Traefik, Nginx Proxy Manager, or another reverse proxy.
+- `COOKIE_SECURE_AUTO`: automatically treats proxied HTTPS requests as secure for future cookie-based auth.
+- `COOKIE_SAMESITE`: SameSite policy for future cookie-based auth. Default is `lax`.
+- `VITE_API_BASE_URL`: optional frontend API override. Leave empty for Docker/reverse proxy deployments so the browser uses relative `/api` and `/socket.io` paths.
+- `PUBLIC_APP_URL` and `CORS_ORIGIN`: legacy names still accepted for older deployments.
 - `DATABASE_URL`: PostgreSQL connection string.
 - `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`: Compose database settings.
 - `SESSION_TTL_HOURS`: opaque session lifetime.
@@ -228,9 +234,11 @@ chat.example.com {
 Set:
 
 ```env
-PUBLIC_APP_URL=https://chat.example.com
-VITE_API_BASE_URL=https://chat.example.com
-CORS_ORIGIN=https://chat.example.com
+APP_PUBLIC_URL=https://chat.example.com
+API_PUBLIC_URL=https://chat.example.com
+ALLOWED_ORIGINS=https://chat.example.com
+TRUST_PROXY=true
+VITE_API_BASE_URL=
 HTTPS_ONLY=true
 ```
 
@@ -243,9 +251,11 @@ HTTPS_ONLY=true
 5. Set:
 
 ```env
-PUBLIC_APP_URL=https://mychat.duckdns.org
-VITE_API_BASE_URL=https://mychat.duckdns.org
-CORS_ORIGIN=https://mychat.duckdns.org
+APP_PUBLIC_URL=https://mychat.duckdns.org
+API_PUBLIC_URL=https://mychat.duckdns.org
+ALLOWED_ORIGINS=https://mychat.duckdns.org
+TRUST_PROXY=true
+VITE_API_BASE_URL=
 ```
 
 Run the app behind Caddy, Nginx Proxy Manager, or Traefik and enable HTTPS. With Caddy, point the Caddyfile host to `mychat.duckdns.org` and proxy to the Compose ports.
@@ -256,7 +266,49 @@ Common DuckDNS issues:
 - Router not forwarding ports 80/443: add port forwarding to the server.
 - HTTPS certificate failure: verify DNS resolves publicly before starting the proxy.
 
-## Cloudflare Tunnel Guide
+## Cloudflare Temporary Tunnel
+
+Temporary tunnels are useful for testing from outside your LAN. They are not guaranteed stable and should not be treated as production hostnames.
+
+Start Chat X:
+
+```bash
+docker compose up -d --build
+```
+
+Start the temporary tunnel against the public web port:
+
+```bash
+cloudflared tunnel --url http://localhost:3000
+```
+
+Copy the generated URL, for example `https://something.trycloudflare.com`. For the safest temporary testing setup, add it to `.env`:
+
+```env
+APP_PUBLIC_URL=https://something.trycloudflare.com
+API_PUBLIC_URL=https://something.trycloudflare.com
+ALLOWED_ORIGINS=https://something.trycloudflare.com
+TRUST_PROXY=true
+VITE_API_BASE_URL=
+```
+
+Then restart:
+
+```bash
+docker compose up -d --build
+```
+
+For a more automatic temporary testing setup, allow all Cloudflare temporary tunnel hostnames:
+
+```env
+ALLOW_CLOUDFLARE_TEMP_TUNNELS=true
+TRUST_PROXY=true
+VITE_API_BASE_URL=
+```
+
+Do not use `ALLOW_CLOUDFLARE_TEMP_TUNNELS=true` as your only production origin policy. Use a named tunnel with a stable hostname for production.
+
+## Cloudflare Tunnel With Custom Domain
 
 Install `cloudflared` using Cloudflare's official package instructions for your OS.
 
@@ -286,20 +338,14 @@ sudo cloudflared service install
 sudo systemctl enable --now cloudflared
 ```
 
-Temporary tunnel for testing:
-
-```bash
-cloudflared tunnel --url http://localhost:3000
-```
-
-Temporary tunnels are not recommended for production because the hostname changes and access policy is harder to control.
-
 Set:
 
 ```env
-PUBLIC_APP_URL=https://chat.example.com
-VITE_API_BASE_URL=https://chat.example.com
-CORS_ORIGIN=https://chat.example.com
+APP_PUBLIC_URL=https://chat.example.com
+API_PUBLIC_URL=https://chat.example.com
+ALLOWED_ORIGINS=https://chat.example.com
+TRUST_PROXY=true
+VITE_API_BASE_URL=
 HTTPS_ONLY=true
 ```
 
@@ -319,13 +365,18 @@ Reverse proxy:
 HTTPS:
 
 - Use Caddy automatic HTTPS, Nginx Proxy Manager Let's Encrypt, Traefik ACME, or Cloudflare Tunnel.
-- Set `PUBLIC_APP_URL`, `VITE_API_BASE_URL`, and `CORS_ORIGIN` to the HTTPS origin.
+- Set `APP_PUBLIC_URL`, `API_PUBLIC_URL`, and `ALLOWED_ORIGINS` to the HTTPS origin.
+- Leave `VITE_API_BASE_URL` empty when the frontend and API are available on the same public origin.
 
 Common errors:
 
-- `CORS` errors: `CORS_ORIGIN` does not match the browser URL.
-- Invite links use localhost: `PUBLIC_APP_URL` is wrong.
+- `Something went wrong` or `Cannot connect to the server`: verify `/api/health` loads from the same public URL as the app.
+- `CORS` errors: `ALLOWED_ORIGINS` does not include the browser URL, or `ALLOW_CLOUDFLARE_TEMP_TUNNELS=true` is missing for a temporary `trycloudflare.com` URL.
+- Cookies not saving or login works locally but not through HTTPS proxy: set `TRUST_PROXY=true` and keep `COOKIE_SECURE_AUTO=true`.
+- Invite links use localhost: `APP_PUBLIC_URL` is wrong, or the current public origin is not allowed.
 - WebSocket fails: reverse proxy is not forwarding `/socket.io/*`.
+- Media or avatars do not load: reverse proxy is not forwarding `/api/media/*`, or the signed media URL expired and should be requested again.
+- QR login is not working: verify `/api/auth/qr/*` and `/socket.io/*` are reachable through the public URL.
 - Media downloads fail after a few minutes: signed URLs are intentionally short lived.
 
 ## Development Commands
@@ -354,6 +405,7 @@ Run all checks:
 npm run lint
 npm run test
 npm run build
+npm run check:deployment
 npm audit --omit=dev
 ```
 
@@ -371,7 +423,7 @@ Web tests:
 npm --workspace web run test
 ```
 
-Current tests cover password policy, storage encryption helpers, opaque token generation, and translation completeness. Database and browser E2E tests should be added before high-trust production use.
+Current tests cover password policy, storage encryption helpers, opaque token generation, origin allow-list handling, Cloudflare temporary tunnel opt-in, proxy-aware secure cookie detection, public invite/media URL generation, the health endpoint, frontend API/WebSocket URL generation, and translation completeness. Browser E2E tests should be added before high-trust production use.
 
 ## GitHub Repository
 

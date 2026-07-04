@@ -142,6 +142,8 @@ export const translations = {
     inviteLink: "Invitation link",
     useCount: "Uses",
     status: "Status",
+    connectionReconnecting: "Reconnecting to the server...",
+    connectionLost: "Cannot connect to the server. Messages will sync when the connection returns.",
     privacy: "Privacy",
     showReadReceipts: "Show read receipts",
     showOnlineStatus: "Show online status",
@@ -297,9 +299,11 @@ export const translations = {
     error_qr_login_not_found: "QR login request was not found or expired.",
     error_invite_expiration_in_past: "Invitation expiration must be in the future.",
     error_invite_expiration_too_long: "Invitation expiration cannot be longer than one month.",
+    error_origin_not_allowed: "This browser URL is not allowed by the server. Check APP_PUBLIC_URL, API_PUBLIC_URL, and ALLOWED_ORIGINS.",
+    error_network_error: "Cannot connect to the server. Check APP_PUBLIC_URL, API_PUBLIC_URL, ALLOWED_ORIGINS, and tunnel proxy settings.",
     error_route_not_found: "Route not found.",
     error_server_error: "Server error.",
-    error_unknown: "Something went wrong."
+    error_unknown: "Unexpected error."
   },
   pt: {
     appName: "Chat X",
@@ -444,6 +448,8 @@ export const translations = {
     inviteLink: "Ligação de convite",
     useCount: "Utilizações",
     status: "Estado",
+    connectionReconnecting: "A restabelecer ligação ao servidor...",
+    connectionLost: "Não é possível ligar ao servidor. As mensagens serão sincronizadas quando a ligação voltar.",
     privacy: "Privacidade",
     showReadReceipts: "Mostrar confirmações de leitura",
     showOnlineStatus: "Mostrar estado online",
@@ -599,9 +605,11 @@ export const translations = {
     error_qr_login_not_found: "Pedido de início por QR não encontrado ou expirado.",
     error_invite_expiration_in_past: "A expiração do convite tem de ser no futuro.",
     error_invite_expiration_too_long: "A expiração do convite não pode exceder um mês.",
+    error_origin_not_allowed: "Este URL do navegador não é permitido pelo servidor. Verifique APP_PUBLIC_URL, API_PUBLIC_URL e ALLOWED_ORIGINS.",
+    error_network_error: "Não é possível ligar ao servidor. Verifique APP_PUBLIC_URL, API_PUBLIC_URL, ALLOWED_ORIGINS e as definições do túnel.",
     error_route_not_found: "Rota não encontrada.",
     error_server_error: "Erro do servidor.",
-    error_unknown: "Algo correu mal."
+    error_unknown: "Erro inesperado."
   },
   fr: {
     appName: "Chat X",
@@ -746,6 +754,8 @@ export const translations = {
     inviteLink: "Lien d'invitation",
     useCount: "Utilisations",
     status: "État",
+    connectionReconnecting: "Reconnexion au serveur...",
+    connectionLost: "Impossible de se connecter au serveur. Les messages se synchroniseront au retour de la connexion.",
     privacy: "Confidentialité",
     showReadReceipts: "Afficher les accusés de lecture",
     showOnlineStatus: "Afficher l'état en ligne",
@@ -901,9 +911,11 @@ export const translations = {
     error_qr_login_not_found: "Demande de connexion QR introuvable ou expirée.",
     error_invite_expiration_in_past: "L'expiration de l'invitation doit être dans le futur.",
     error_invite_expiration_too_long: "L'expiration de l'invitation ne peut pas dépasser un mois.",
+    error_origin_not_allowed: "Cette URL du navigateur n'est pas autorisée par le serveur. Vérifiez APP_PUBLIC_URL, API_PUBLIC_URL et ALLOWED_ORIGINS.",
+    error_network_error: "Impossible de se connecter au serveur. Vérifiez APP_PUBLIC_URL, API_PUBLIC_URL, ALLOWED_ORIGINS et la configuration du tunnel.",
     error_route_not_found: "Route introuvable.",
     error_server_error: "Erreur serveur.",
-    error_unknown: "Une erreur est survenue."
+    error_unknown: "Erreur inattendue."
   }
 };
 

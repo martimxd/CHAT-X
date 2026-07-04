@@ -252,6 +252,23 @@ small {
   background: var(--sidebar);
 }
 
+.connection-banner {
+  position: absolute;
+  z-index: 20;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(92%, 560px);
+  border: 1px solid rgba(154, 91, 19, 0.28);
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  background: #fff7e6;
+  color: #7a3f08;
+  box-shadow: var(--shadow);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
 .wa-sidebar-topbar,
 .wa-chat-header {
   min-height: 64px;
@@ -468,6 +485,7 @@ small {
 }
 
 .wa-workspace {
+  position: relative;
   min-width: 0;
   min-height: 0;
   background: #f8f9fa;

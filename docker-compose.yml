@@ -24,17 +24,24 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       APP_NAME: ${APP_NAME:-Chat X}
-      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-${PUBLIC_APP_URL:-http://localhost:3000}}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:3000}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      ALLOW_CLOUDFLARE_TEMP_TUNNELS: ${ALLOW_CLOUDFLARE_TEMP_TUNNELS:-false}
       DATABASE_URL: ${DATABASE_URL:-postgres://chat_x:change-this-database-password@db:5432/chat_x}
       MEDIA_ROOT: /app/media
       API_PORT: 4000
-      TRUST_PROXY: ${TRUST_PROXY:-false}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      COOKIE_SECURE_AUTO: ${COOKIE_SECURE_AUTO:-true}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-168}
       BCRYPT_COST: ${BCRYPT_COST:-12}
       LOGIN_RATE_LIMIT_MAX: ${LOGIN_RATE_LIMIT_MAX:-8}
       REGISTER_RATE_LIMIT_MAX: ${REGISTER_RATE_LIMIT_MAX:-8}
       MESSAGE_RATE_LIMIT_MAX: ${MESSAGE_RATE_LIMIT_MAX:-120}
+      QR_LOGIN_TTL_SECONDS: ${QR_LOGIN_TTL_SECONDS:-120}
       MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:-dev-only-change-this-media-signing-secret}
       MEDIA_ENCRYPTION_KEY_BASE64: ${MEDIA_ENCRYPTION_KEY_BASE64:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-52428800}
@@ -58,7 +65,7 @@ services:
     build:
       context: ./web
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:4000}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     restart: unless-stopped
     depends_on:
       server:

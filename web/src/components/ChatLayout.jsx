@@ -1,5 +1,6 @@
 import React from "react";
 import { ChatSidebar } from "./ChatSidebar.jsx";
+import { useI18n } from "../i18n/I18nProvider.jsx";
 
 export function ChatLayout({
   user,
@@ -15,8 +16,12 @@ export function ChatLayout({
   onLogout,
   presence,
   typingByChat,
+  connectionStatus,
   children
 }) {
+  const { t } = useI18n();
+  const showConnectionStatus = connectionStatus && connectionStatus !== "connected";
+
   return (
     <div className={`wa-app-shell ${mobileChatOpen ? "mobile-chat-open" : ""}`}>
       <ChatSidebar
@@ -33,7 +38,14 @@ export function ChatLayout({
         presence={presence}
         typingByChat={typingByChat}
       />
-      <main className="wa-workspace">{children}</main>
+      <main className="wa-workspace">
+        {showConnectionStatus && (
+          <div className="connection-banner">
+            {connectionStatus === "connecting" ? t("connectionReconnecting") : t("connectionLost")}
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

@@ -1,11 +1,11 @@
 import express from "express";
 import { z } from "zod";
-import { config } from "../config.js";
 import { query } from "../db.js";
 import { hashPassword, requireAdmin, requireAuth } from "../lib/auth.js";
 import { audit } from "../lib/audit.js";
 import { decryptFromStorage, encryptForStorage, randomToken, sha256Hex } from "../lib/crypto.js";
 import { asyncHandler, pickUserPublic } from "../lib/http.js";
+import { buildPublicUrl } from "../lib/origin.js";
 import { apiError, parseBody, passwordSchema, usernameSchema } from "../lib/validators.js";
 
 export const adminRouter = express.Router();
@@ -116,7 +116,7 @@ adminRouter.get(
         if (invite.token_ciphertext && invite.token_encryption) {
           try {
             const token = decryptFromStorage(invite.token_ciphertext, invite.token_encryption).toString("utf8");
-            url = `${config.publicAppUrl}/invite/${token}`;
+            url = buildPublicUrl(req, `/invite/${token}`);
           } catch {
             url = null;
           }
@@ -162,7 +162,7 @@ adminRouter.post(
       invite: {
         id: result.rows[0].id,
         token,
-        url: `${config.publicAppUrl}/invite/${token}`,
+        url: buildPublicUrl(req, `/invite/${token}`),
         expiresAt: result.rows[0].expires_at,
         maxUses: result.rows[0].max_uses,
         useCount: result.rows[0].use_count,

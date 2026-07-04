@@ -19,6 +19,21 @@ function asBoolean(name, fallback) {
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 }
 
+function readFirst(names, fallback = "") {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value !== undefined && value !== "") return value;
+  }
+  return fallback;
+}
+
+function splitCsv(value) {
+  return (value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function readMediaKey() {
   const configured = process.env.MEDIA_ENCRYPTION_KEY_BASE64;
   if (configured) {
@@ -36,10 +51,20 @@ function readMediaKey() {
 export const config = {
   nodeEnv: process.env.NODE_ENV || "development",
   appName: process.env.APP_NAME || "Chat X",
-  publicAppUrl: process.env.PUBLIC_APP_URL || "http://localhost:3000",
+  version: process.env.APP_VERSION || process.env.npm_package_version || "0.1.0",
+  publicAppUrl: readFirst(["APP_PUBLIC_URL", "PUBLIC_APP_URL"], "http://localhost:3000"),
+  apiPublicUrl: readFirst(["API_PUBLIC_URL"], readFirst(["APP_PUBLIC_URL", "PUBLIC_APP_URL"], "http://localhost:3000")),
   port: asNumber("API_PORT", 4000),
   trustProxy: asBoolean("TRUST_PROXY", false),
-  corsOrigin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  allowedOrigins: [
+    ...splitCsv(process.env.ALLOWED_ORIGINS),
+    ...splitCsv(process.env.CORS_ORIGIN),
+    readFirst(["APP_PUBLIC_URL", "PUBLIC_APP_URL"], "http://localhost:3000"),
+    readFirst(["API_PUBLIC_URL"], "")
+  ].filter(Boolean),
+  allowCloudflareTempTunnels: asBoolean("ALLOW_CLOUDFLARE_TEMP_TUNNELS", false),
+  cookieSecureAuto: asBoolean("COOKIE_SECURE_AUTO", true),
+  cookieSameSite: readFirst(["COOKIE_SAMESITE"], "lax").toLowerCase(),
   databaseUrl: process.env.DATABASE_URL || "postgres://chat_x:change-this-database-password@localhost:5432/chat_x",
   bcryptCost: asNumber("BCRYPT_COST", 12),
   sessionTtlHours: asNumber("SESSION_TTL_HOURS", 168),

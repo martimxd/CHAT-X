@@ -12,6 +12,7 @@ import { query } from "../db.js";
 import { decryptFromStorage, encryptForStorage, signMediaUrl } from "../lib/crypto.js";
 import { asyncHandler } from "../lib/http.js";
 import { ensureMediaRoot, storagePathFor, userCanAccessMedia } from "../lib/media.js";
+import { buildMediaDownloadPath } from "../lib/public-paths.js";
 import { requireAuth } from "../lib/auth.js";
 import { apiError } from "../lib/validators.js";
 import { permissionAllows } from "../lib/social.js";
@@ -185,7 +186,7 @@ mediaRouter.get(
     const expiresAt = Math.floor(Date.now() / 1000) + config.signedMediaUrlTtlSeconds;
     const signature = signMediaUrl({ mediaId: req.params.id, userId: req.user.id, expiresAt });
     return res.json({
-      url: `/api/media/${req.params.id}/download?expiresAt=${expiresAt}&signature=${encodeURIComponent(signature)}`,
+      url: buildMediaDownloadPath(req.params.id, expiresAt, signature),
       expiresAt
     });
   })

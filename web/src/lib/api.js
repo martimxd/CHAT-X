@@ -1,4 +1,8 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+import { deploymentHint, resolveApiBaseUrl, resolveApiUrl, resolveWebSocketUrl } from "./network.js";
+
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_PUBLIC_URL || "";
+
+export const API_BASE_URL = resolveApiBaseUrl(RAW_API_BASE_URL);
 const TOKEN_KEY = "chatx_token";
 
 export function getToken() {
@@ -20,11 +24,27 @@ export async function api(path, options = {}) {
   if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-    body: options.body && !(options.body instanceof FormData) ? JSON.stringify(options.body) : options.body
-  });
+  let response;
+  try {
+    response = await fetch(resolveApiUrl(path, RAW_API_BASE_URL), {
+      ...options,
+      headers,
+      body: options.body && !(options.body instanceof FormData) ? JSON.stringify(options.body) : options.body
+    });
+  } catch (cause) {
+    if (import.meta.env.DEV) {
+      console.warn("API request failed", {
+        path,
+        apiBaseUrl: API_BASE_URL || "(same-origin)",
+        hint: deploymentHint(),
+        cause
+      });
+    }
+    const error = new Error("network_error");
+    error.code = "network_error";
+    error.details = deploymentHint();
+    throw error;
+  }
 
   if (response.status === 204) return null;
   const data = await response.json().catch(() => ({}));
@@ -39,5 +59,13 @@ export async function api(path, options = {}) {
 }
 
 export function apiUrl(path) {
-  return `${API_BASE_URL}${path}`;
+  return resolveApiUrl(path, RAW_API_BASE_URL);
+}
+
+export function socketUrl() {
+  return resolveWebSocketUrl(RAW_API_BASE_URL);
+}
+
+export function networkHint() {
+  return deploymentHint();
 }

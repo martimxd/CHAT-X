@@ -1,9 +1,9 @@
 import { Server } from "socket.io";
-import { config } from "./config.js";
 import { query } from "./db.js";
 import { loadSession } from "./lib/auth.js";
 import { incrementOnline, decrementOnline } from "./lib/presence.js";
 import { directChatPeer, userBlockedTarget } from "./lib/social.js";
+import { describeOriginPolicy, isOriginAllowed } from "./lib/origin.js";
 
 async function getUserChatIds(userId) {
   const result = await query("SELECT chat_id FROM chat_members WHERE user_id = $1 AND deleted_at IS NULL", [userId]);
@@ -79,8 +79,22 @@ async function emitTyping(io, socket, chatId, isTyping) {
 export function setupSocket(server) {
   const io = new Server(server, {
     cors: {
-      origin: config.corsOrigin,
-      credentials: false
+      origin(origin, callback) {
+        const allowed = isOriginAllowed(origin);
+        if (origin && !allowed) {
+          console.warn("Socket origin rejected", { origin, policy: describeOriginPolicy() });
+        }
+        callback(null, allowed);
+      },
+      credentials: true
+    },
+    allowRequest(req, callback) {
+      const origin = req.headers.origin;
+      const allowed = isOriginAllowed(origin);
+      if (origin && !allowed) {
+        console.warn("Socket handshake rejected", { origin, host: req.headers.host, policy: describeOriginPolicy() });
+      }
+      callback(null, allowed);
     }
   });
 
